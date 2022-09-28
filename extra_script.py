@@ -1,3 +1,4 @@
+Import("projenv")
 Import("env")
 
 import os
@@ -19,7 +20,9 @@ boards_metas = {
     "esp32dev" : "colcon.meta",
     "olimex_e407" :  "colcon.meta",
     "due" : "colcon_verylowmem.meta",
-    "zero" : "colcon_verylowmem.meta"
+    "zero" : "colcon_verylowmem.meta",
+    "pico": "colcon.meta"
+
 }
 
 project_options = env.GetProjectConfig().items(env=env["PIOENV"], as_dict=True)
@@ -38,7 +41,7 @@ microros_distro = global_env.BoardConfig().get("microros_distro", "humble")
 microros_transport = global_env.BoardConfig().get("microros_transport", "serial")
 
 # Retrieve the user meta. Default none
-microros_user_meta = global_env.BoardConfig().get("microros_user_meta", "")
+microros_user_meta = "{}/{}".format(env['PROJECT_DIR'], global_env.BoardConfig().get("microros_user_meta", ""))
 
 # Do not include build folder
 env['SRC_FILTER'] += ' -<build/include/*>'
@@ -99,7 +102,7 @@ def build_microros(*args, **kwargs):
     #######################################################
 
     # Add library
-    if (board == "portenta_h7_m7" or board == "nanorp2040connect"):
+    if (board == "portenta_h7_m7" or board == "nanorp2040connect" or board == "pico"):
         # Workaround for including the library in the linker group
         #   This solves a problem with duplicated symbols in Galactic
         global_env["_LIBFLAGS"] = "-Wl,--start-group " + global_env["_LIBFLAGS"] + " -l{} -Wl,--end-group".format(builder.library_name)
@@ -109,6 +112,7 @@ def build_microros(*args, **kwargs):
     # Add library path
     global_env.Append(LIBPATH=[builder.library_path])
 
+def update_env():
     # Add required defines
     global_env.Append(CPPDEFINES=[("CLOCK_MONOTONIC", 1)])
 
@@ -129,8 +133,8 @@ def build_microros(*args, **kwargs):
         main_path + "/platform_code/{}/{}".format(framework, microros_transport)])
 
     # Add micro-ROS defines to user application
-    global_env.Append(CPPDEFINES=[('MICRO_ROS_TRANSPORT_{}_{}'.format(framework.upper(), microros_transport.upper()), 1)])
-    global_env.Append(CPPDEFINES=[('MICRO_ROS_DISTRO_ {} '.format(microros_distro.upper()), 1)])
+    projenv.Append(CPPDEFINES=[('MICRO_ROS_TRANSPORT_{}_{}'.format(framework.upper(), microros_transport.upper()), 1)])
+    projenv.Append(CPPDEFINES=[('MICRO_ROS_DISTRO_{} '.format(microros_distro.upper()), 1)])
 
     # Include path for framework
     global_env.Append(CPPPATH=[main_path + "/platform_code/{}".format(framework)])
@@ -147,3 +151,5 @@ from SCons.Script import COMMAND_LINE_TARGETS
 # Do not build library on clean_microros target or when IDE fetches C/C++ project metadata
 if set(["clean_microros", "_idedata", "idedata"]).isdisjoint(set(COMMAND_LINE_TARGETS)):
     build_microros()
+
+update_env()
